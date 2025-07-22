@@ -112,6 +112,7 @@ if (write(child_to_parent[1], &buffer, 1) != 1) {
     printf("child write error\n");
     exit(1);
 }
+```
 
 4. 输入 `make qemu`，并运行 `pingpong` 程序。
 
@@ -161,6 +162,7 @@ if (pid == 0) {
     wait(0);
     exit(0);
 }
+```
 
 6. 输入 `make qemu`，并运行 `primes` 程序。
 
@@ -219,6 +221,7 @@ while (read(fd, &de, sizeof(de)) == sizeof(de)) {
             break;
     }
 }
+```
 
 5. 输入 `make qemu`，并运行 `find` 程序。
 
@@ -263,6 +266,7 @@ while (*p) {
     while (*p && *p != ' ') p++;    // 移动到下一个空格或结束
     if (*p) *p++ = 0;               // 用 '\0' 终结当前单词
 }
+```
 
 3. `fork()` 创建子进程，`PID` 为 0 时启动 `full_argv[0]` 代表的程序，`PID > 0` 时调用 `wait()` 系统调用，它会阻塞并等待子进程完成。
 ```c
@@ -277,6 +281,7 @@ if (pid < 0) {
 } else {
     wait(0);
 }
+```
 
 4. 输入 `make qemu`，并运行 `xargs` 程序。
 
