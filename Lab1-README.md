@@ -54,12 +54,18 @@
 
 ### 2. 实验内容
 1. 新建 `sleep.c` 并编写代码，其中 `argc` 表示命令行参数个数，`argv` 是字符串数组，存储各个参数的内容。若用户输入参数不为 2 个，则报错退出；否则将用户输入的字符串参数转换为整数，并调用 `sleep` 系统调用让进程暂停指定的 tick 数。
-
-![](image/1-3.png)
+  ```bash
+  int main(int argc, char *argv[]){
+	    if (argc != 2) {
+		       fprintf(2, "usage: sleep pattern [file ...]\n");
+		      exit(1);
+	    }
+	    sleep(atoi(argv[1]));
+	    exit(0);
+  }
+  ```
 
 2. 在 `Makefile` 的 `UPROGS` 中添加 `sleep` 程序。
-
-![](image/1-4.png)
 
 3. 输入 `make qemu`，并运行 `sleep` 程序（这里选择 `sleep 10`），初步判断程序能否暂停指定的 tick 数，然后输入 `Ctrl-a` 再输入 `x` 退出。
 
@@ -90,8 +96,22 @@
 1. 本实验是使用管道 `pipe` 和 `fork` 实现父子进程之间通信的经典例子，程序完成的功能是父进程向子进程发送一个字节，子进程读取该字节后再向父进程发回一个字节，类似 pingpong。
 2. 定义两个整数数组，每个数组长度为 2，`[0]` 为读端，`[1]` 为写端，分别用于两个管道，其中 `parent_to_child` 为父进程写、子进程读，`child_to_parent` 为子进程写、父进程读；定义一个字符变量 `buffer`，初始为 `'p'`，作为传输字节的演示；创建两个无名管道用于父子进程间通信。用 `fork()` 创建子进程，返回值 `pid > 0` 表示父进程（返回的是子进程的 PID），`0` 表示子进程，`< 0` 表示创建失败，进而分别执行父子进程的情况。
 3. 子进程情况下：先关闭无用端口防止误用或阻塞，然后子进程从父进程读 1 字节到 `buffer`，输出收到的数据并通过 `getpid()` 打印进程 ID，子进程将刚收到的字节发送给父进程并关闭刚刚用过的管道端口。
+```c
+close(parent_to_child[1]);  // 关闭写端
+close(child_to_parent[0]);  // 关闭读端
 
-![](image/1-8.png)
+// 读父进程传来的字节
+if (read(parent_to_child[0], &buffer, 1) != 1) {
+    printf("child read error\n");
+    exit(1);
+}
+printf("%d: received ping\n", getpid());
+
+// 向父进程写回字节
+if (write(child_to_parent[1], &buffer, 1) != 1) {
+    printf("child write error\n");
+    exit(1);
+}
 
 4. 输入 `make qemu`，并运行 `pingpong` 程序。
 
@@ -121,12 +141,26 @@
 2. 先定义递归函数，递归处理从文件描述符 `fd` 中读取数据并筛选；当 `read()` 为 0 时表示数据已读完，关闭管道并输出。
 3. 创建管道 `p`，通过 `fork()` 创建子进程。
 4. 子进程情况下：子进程关闭管道写端 `p[1]`，关闭原管道 `pd`，子进程递归调用 `func_ptr(p[0])`，传递新的管道读取端口 `p[0]`，进一步筛选素数。
-
-![](image/1-12.png)
-
 5. 父进程情况下：父进程关闭管道读端 `p[0]`，通过管道从 `fd` 读取数字，循环读取数字 `num`，如果 `num` 不能被当前素数 `prime` 整除，则将 `num` 写入新管道并传给子进程，最后关闭 `fd` 和 `p[1]` 释放资源。
-
-![](image/1-13.png)
+```c
+if (pid == 0) {
+    close(p[1]);
+    close(fd);
+    void (*func_ptr)(int) = _primes;
+    func_ptr(p[0]);
+} else {
+    close(p[0]);
+    int num;
+    while (read(fd, &num, sizeof(num)) > 0) {
+        if (num % prime != 0) {
+            write(p[1], &num, sizeof(num));
+        }
+    }
+    close(fd);
+    close(p[1]);
+    wait(0);
+    exit(0);
+}
 
 6. 输入 `make qemu`，并运行 `primes` 程序。
 
@@ -152,10 +186,39 @@
 2. 定义 `find` 函数，参数 `path` 为要找的目录路径，`target` 为要找的文件名；分别定义打开的目录文件描述符、目录项结构体和文件或目录的状态信息。
 3. 使用 `open()` 打开目录 `path`，返回 `fd`，`0` 表示只读模式；使用 `fstat()` 获取目录文件的状态信息并储存结果；将路径拷贝到缓存区并在每段路径结束后加入路径分隔符 `\`。
 4. 使用 `read()` 遍历目录文件内容并判断文件类型，其中跳过代表当前目录和父目录的 "." 和 ".." 这两个特殊目录项，生成新路径。
+```c
+// 遍历目录内容
+while (read(fd, &de, sizeof(de)) == sizeof(de)) {
+    if (de.inum == 0)
+        continue;
 
-![](image/1-15.png)
+    // 跳过 "." 和 ".."
+    if (!strcmp(de.name, ".") || !strcmp(de.name, ".."))
+        continue;
 
-![](image/1-16.png)
+    // 生成新路径
+    memmove(p, de.name, DIRSIZ);
+    p[DIRSIZ] = 0;
+
+    // 获取文件状态
+    if (stat(buf, &st) < 0) {
+        printf("find: cannot stat %s\n", buf);
+        continue;
+    }
+
+    // 判断文件类型
+    switch (st.type) {
+        case T_FILE:
+            if (!strcmp(de.name, target)) {
+                printf("%s\n", buf);
+            }
+            break;
+        case T_DIR:
+            // 递归查找子目录
+            find(buf, target);
+            break;
+    }
+}
 
 5. 输入 `make qemu`，并运行 `find` 程序。
 
@@ -181,12 +244,39 @@
 ### 2. 实验内容
 1. 本实验要将标准输入每行的内容作为参数添加到原命令后，每读取一行就 `fork + exec` 执行一次命令，使用空格分割输入行，允许多个参数，支持基础命令带原始参数。
 2. 逐字符读取输入，读到换行符则终止字符串；新建 `full_argv` 保存完整命令参数（包括 base 和输入部分），新建 `arg_index` 作为追加参数的指针，使用指针 `p` 遍历字符串并处理空格部分。
+```c
+// 构造参数列表
+char *full_argv[MAXARG];
+int arg_index = 0;
 
-![](image/1-19.png)
+// 复制基础参数
+for (int j = 0; j < base_argc; j++) {
+    full_argv[arg_index++] = base_argv[j];
+}
+
+// 按空格分词添加输入参数
+char *p = buf;
+while (*p) {
+    while (*p == ' ') p++;          // 跳过前导空格
+    if (*p == 0) break;             // 到达字符串末尾
+    full_argv[arg_index++] = p;     // 记录单词起始位置
+    while (*p && *p != ' ') p++;    // 移动到下一个空格或结束
+    if (*p) *p++ = 0;               // 用 '\0' 终结当前单词
+}
 
 3. `fork()` 创建子进程，`PID` 为 0 时启动 `full_argv[0]` 代表的程序，`PID > 0` 时调用 `wait()` 系统调用，它会阻塞并等待子进程完成。
-
-![](image/1-20.png)
+```c
+int pid = fork();
+if (pid < 0) {
+    fprintf(2, "fork failed\n");
+    exit(1);
+} else if (pid == 0) {
+    exec(full_argv[0], full_argv);
+    fprintf(2, "exec failed: %s\n", full_argv[0]);
+    exit(1);
+} else {
+    wait(0);
+}
 
 4. 输入 `make qemu`，并运行 `xargs` 程序。
 
