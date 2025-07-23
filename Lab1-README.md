@@ -29,7 +29,6 @@
   - [3. 问题解决](#3-问题解决-4)
   - [4. 实验心得](#4-实验心得-4)
 - [实验得分](#实验得分)
-
 ---
 
 ## Boot xv6 (easy)
@@ -74,7 +73,7 @@
 
 4. 输入 `./grade-lab-util sleep` 或 `make GRADEFLAGS=sleep grade`，验证程序能否通过与 `sleep` 相关的所有测试用例。
 
-<img src="image/1-7.png" alt="image" height="50">
+<img src="image/1-7.png" alt="image" height="100">
 
 
 ### 3. 问题解决
@@ -224,7 +223,7 @@ while (read(fd, &de, sizeof(de)) == sizeof(de)) {
 
 5. 输入 `make qemu`，并运行 `find` 程序。
 
-<img src="image/1-17.png" alt="image" height="50">
+<img src="image/1-17.png" alt="image" height="100">
 
 <img src="image/1-18.png" alt="image" height="200">
 
@@ -284,7 +283,7 @@ if (pid < 0) {
 
 4. 输入 `make qemu`，并运行 `xargs` 程序。
 
-<img src="image/1-21.png" alt="image" height="50">
+<img src="image/1-21.png" alt="image" height="100">
 
 <img src="image/1-22.png" alt="image" height="100">
 
@@ -300,4 +299,4 @@ if (pid < 0) {
 
 ## 实验得分
 
-<img src="image/1-23.png" alt="image" height="500">
+<img src="image/1-23.png" alt="image" height="600">
