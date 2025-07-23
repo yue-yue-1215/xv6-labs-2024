@@ -3,20 +3,20 @@
 **2351759 程琮越**
 
 - [Using gdb (easy)](#using-gdb-easy)
-  - [1. 实验目的](#1-实验目的-1)
-  - [2. 实验内容](#2-实验内容-1)
-  - [3. 问题解决](#3-问题解决-1)
-  - [4. 实验心得](#4-实验心得-1)
+  - [1. 实验目的](#1-实验目的)
+  - [2. 实验内容](#2-实验内容)
+  - [3. 问题解决](#3-问题解决)
+  - [4. 实验心得](#4-实验心得)
 - [System call tracing (moderate)](#system-call-tracing-moderate)
-  - [1. 实验目的](#1-实验目的-2)
-  - [2. 实验内容](#2-实验内容-2)
-  - [3. 问题解决](#3-问题解决-2)
-  - [4. 实验心得](#4-实验心得-2)
+  - [1. 实验目的](#1-实验目的)
+  - [2. 实验内容](#2-实验内容)
+  - [3. 问题解决](#3-问题解决)
+  - [4. 实验心得](#4-实验心得)
 - [Attack xv6 (moderate)](#attack-xv6-moderate)
-  - [1. 实验目的](#1-实验目的-3)
-  - [2. 实验内容](#2-实验内容-3)
-  - [3. 问题解决](#3-问题解决-3)
-  - [4. 实验心得](#4-实验心得-3)
+  - [1. 实验目的](#1-实验目的)
+  - [2. 实验内容](#2-实验内容)
+  - [3. 问题解决](#3-问题解决)
+  - [4. 实验心得](#4-实验心得)
 - [实验得分](#实验得分)
 
 ---
@@ -34,7 +34,7 @@
 ### 2. 实验内容
 1. 输入`make qemu-gdb`。
 
-    <img src="image/2-2.png" alt="image" height="200">
+    <img src="image/2-2.png" alt="image" height="150">
 
 2. 打开另一个终端，先安装多架构GDB：
     ```bash
@@ -47,11 +47,11 @@
     ```
     然后在GDB中连接QEMU。
 
-    <img src="image/2-3.png" alt="image" height="200">
+    <img src="image/2-3.png" alt="image" height="150">
 
 3. 设置断点并继续执行直到触发断点。
 
-    <img src="image/2-4.png" alt="image" height="200">
+    <img src="image/2-4.png" alt="image" height="150">
 
 4. 输入`layout src`将窗口一分为二，可查看源码布局。
 
@@ -65,15 +65,15 @@
     - `p->trapframe->a7`的值为`0x7`，表示系统调用号，用于告诉内核用户程序请求执行哪个系统调用。
     - 要看CPU之前处于什么模式，可以查看`sstatus`寄存器中SPP位（第8位），SPP位为0表示CPU之前处于用户模式。
 
-      <img src="image/2-7.png" alt="image" height="200">
+      <img src="image/2-7.png" alt="image" height="150">
 
     - 用`backtrace`可以看到`usertrap()`就是直接调用`syscall`的函数。
 
-      <img src="image/2-8.png" alt="image" height="200">
+      <img src="image/2-8.png" alt="image" height="150">
 
 7. 将`syscall.c`中`num = p->trapframe->a7;`替换为`num = *(int *)0;`会导致内核panic，要追踪内核page-fault panic的来源，需要搜索刚刚看到的panic打印的`sepc`值在文件`kernel/kernel.asm`，其中包含编译的内核。
 
-    <img src="image/2-9.png" alt="image" height="200">
+    <img src="image/2-9.png" alt="image" height="150">
 
 8. 崩溃时执行的汇编指令：`lw a3,0(zero)`，对应`num`变量的寄存器：`a3`。
 
@@ -87,7 +87,7 @@
 
 10. 确认内核panic时正在运行的进程的名称及进程ID。
 
-    <img src="image/2-13.png" alt="image" height="200">
+    <img src="image/2-13.png" alt="image" height="150">
 
 ### 3. 问题解决
 1. 最开始想尝试`gdb kernel/kernel`（启动GDB并加载内核符号）发现单步执行时出现`(gdb) c The program is not being run.`的问题，安装多架构GDB解决问题。
@@ -183,8 +183,7 @@ static char *syscall_names[] = {
   [SYS_trace]  "trace"
 };
 ```
-
-**再修改`syscall`函数。**
+    - 再修改`syscall`函数。
 ```c
 void syscall(void) {
   int num;
@@ -207,8 +206,7 @@ void syscall(void) {
   }
 }
 ```
-
-**然后在`syscalls`数组中添加`sys_trace`条目。**
+    - 然后在`syscalls`数组中添加`sys_trace`条目。
 ```c
 [SYS_close]    sys_close,
 [SYS_trace]    sys_trace    // add
@@ -218,9 +216,9 @@ void syscall(void) {
 
     <img src="image/2-14.png" alt="image" height="300">
 
-    <img src="image/2-15.png" alt="image" height="300">
+    <img src="image/2-15.png" alt="image" height="200">
 
-    <img src="image/2-16.png" alt="image" height="200">
+    <img src="image/2-16.png" alt="image" height="150">
 
 ### 3. 问题解决
 1. 在`kernel/syscall.c`顶部位添加添加函数声明，导致未定义的错误。
@@ -251,4 +249,4 @@ void syscall(void) {
 
 ## 实验得分
 
-  <img src="image/2-18.png" alt="image" height="300">
+  <img src="image/2-18.png" alt="image" height="500">
