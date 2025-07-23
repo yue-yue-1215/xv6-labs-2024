@@ -59,17 +59,17 @@
 
 5. 输入`n`直到跳过`struct proc *p = myproc();`，打印当前进程的结构体。
 
-    <img src="image/2-6.png" alt="image" height="150">
+    <img src="image/2-6.png" alt="image" height="50">
 
 6. 查看`p->trapframe->a7`的值，查看`sstatus`寄存器，查看调用栈：
     - `p->trapframe->a7`的值为`0x7`，表示系统调用号，用于告诉内核用户程序请求执行哪个系统调用。
     - 要看CPU之前处于什么模式，可以查看`sstatus`寄存器中SPP位（第8位），SPP位为0表示CPU之前处于用户模式。
 
-      <img src="image/2-7.png" alt="image" height="100">
+      <img src="image/2-7.png" alt="image" height="50">
 
     - 用`backtrace`可以看到`usertrap()`就是直接调用`syscall`的函数。
 
-      <img src="image/2-8.png" alt="image" height="100">
+      <img src="image/2-8.png" alt="image" height="50">
 
 7. 将`syscall.c`中`num = p->trapframe->a7;`替换为`num = *(int *)0;`会导致内核panic，要追踪内核page-fault panic的来源，需要搜索刚刚看到的panic打印的`sepc`值在文件`kernel/kernel.asm`，其中包含编译的内核。
 
@@ -77,9 +77,9 @@
 
 8. 崩溃时执行的汇编指令：`lw a3,0(zero)`，对应`num`变量的寄存器：`a3`。
 
-    <img src="image/2-10.png" alt="image" height="200">
+    <img src="image/2-10.png" alt="image" height="100">
 
-    <img src="image/2-11.png" alt="image" height="150">
+    <img src="image/2-11.png" alt="image" height="100">
 
 9. 输入`layout asm`，再输入`c`，程序会停在`lw a3,0(zero)`指令处，这是崩溃前的最后一条指令。
 
@@ -87,7 +87,7 @@
 
 10. 确认内核panic时正在运行的进程的名称及进程ID。
 
-    <img src="image/2-13.png" alt="image" height="50">
+    <img src="image/2-13.png" alt="image" height="100">
 
 ### 3. 问题解决
 1. 最开始想尝试`gdb kernel/kernel`（启动GDB并加载内核符号）发现单步执行时出现`(gdb) c The program is not being run.`的问题，安装多架构GDB解决问题。
@@ -236,7 +236,7 @@ void syscall(void) {
 1. 漏洞环境已经预先搭建完成，`#ifndef LAB_SYSCALL`使清零代码被自动排除，从而实现“内存分配后保留之前的内容”的漏洞效果。
 2. 先使用`sbrk(PGSIZE*17)`分配了17页内存（实际使用的内存应该是与第一段代码中分配的内存区域重叠）；然后通过`end + 32`来定位到第一段代码写入`argv[1]`（即传入的秘密密码）的内存地址；最后将8字节秘密写入文件描述符2（stderr）。
 
-    <img src="image/2-17.png" alt="image" height="200">
+    <img src="image/2-17.png" alt="image" height="100">
 
 3. 要使攻击有效，必须确保密码数据在`end + 32`这个位置，因此不能将32改为0。如果修改为0，攻击就会失效，因为代码的内存布局和攻击的预期位置都发生了变化。
 

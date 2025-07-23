@@ -41,10 +41,9 @@
    ```
 2. 编译 xv6
 
-![](image/1-1.png)
+<img src="image/1-1.png" alt="image" height="50">
 
-![](image/1-2.png)
-
+<img src="image/1-2.png" alt="image" height="100">
 ---
 
 ## sleep (easy)
@@ -69,9 +68,9 @@
 
 3. 输入 `make qemu`，并运行 `sleep` 程序（这里选择 `sleep 10`），初步判断程序能否暂停指定的 tick 数，然后输入 `Ctrl-a` 再输入 `x` 退出。
 
-![](image/1-5.png)
+<img src="image/1-5.png" alt="image" height="50">
 
-![](image/1-6.png)
+<img src="image/1-6.png" alt="image" height="100">
 
 4. 输入 `./grade-lab-util sleep` 或 `make GRADEFLAGS=sleep grade`，验证程序能否通过与 `sleep` 相关的所有测试用例。
 
@@ -118,7 +117,7 @@ if (write(child_to_parent[1], &buffer, 1) != 1) {
 
 ![](image/1-9.png)
 
-![](image/1-10.png)
+<img src="image/1-1.png" alt="image" height="100">
 
 ![](image/1-11.png)
 
@@ -227,7 +226,7 @@ while (read(fd, &de, sizeof(de)) == sizeof(de)) {
 
 ![](image/1-17.png)
 
-![](image/1-18.png)
+<img src="image/1-18.png" alt="image" height="200">
 
 
 ### 3. 问题解决
@@ -287,7 +286,7 @@ if (pid < 0) {
 
 ![](image/1-21.png)
 
-![](image/1-22.png)
+<img src="image/1-22.png" alt="image" height="150">
 
 
 ### 3. 问题解决
@@ -301,4 +300,4 @@ if (pid < 0) {
 
 ## 实验得分
 
-![](image/1-23.png)
+<img src="image/1-23.png" alt="image" height="500">
