@@ -74,7 +74,7 @@
 
 4. 输入 `./grade-lab-util sleep` 或 `make GRADEFLAGS=sleep grade`，验证程序能否通过与 `sleep` 相关的所有测试用例。
 
-![](image/1-7.png)
+<img src="image/1-7.png" alt="image" height="50">
 
 
 ### 3. 问题解决
@@ -115,11 +115,11 @@ if (write(child_to_parent[1], &buffer, 1) != 1) {
 
 4. 输入 `make qemu`，并运行 `pingpong` 程序。
 
-![](image/1-9.png)
+<img src="image/1-9.png" alt="image" height="50">
 
-<img src="image/1-1.png" alt="image" height="100">
+<img src="image/1-10.png" alt="image" height="50">
 
-![](image/1-11.png)
+<img src="image/1-11.png" alt="image" height="50">
 
 
 ### 3. 问题解决
@@ -165,7 +165,7 @@ if (pid == 0) {
 
 6. 输入 `make qemu`，并运行 `primes` 程序。
 
-![](image/1-14.png)
+<img src="image/1-14.png" alt="image" height="50">
 
 
 ### 3. 问题解决
@@ -224,7 +224,7 @@ while (read(fd, &de, sizeof(de)) == sizeof(de)) {
 
 5. 输入 `make qemu`，并运行 `find` 程序。
 
-![](image/1-17.png)
+<img src="image/1-17.png" alt="image" height="50">
 
 <img src="image/1-18.png" alt="image" height="200">
 
@@ -284,9 +284,9 @@ if (pid < 0) {
 
 4. 输入 `make qemu`，并运行 `xargs` 程序。
 
-![](image/1-21.png)
+<img src="image/1-21.png" alt="image" height="50">
 
-<img src="image/1-22.png" alt="image" height="150">
+<img src="image/1-22.png" alt="image" height="100">
 
 
 ### 3. 问题解决
