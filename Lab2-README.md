@@ -23,7 +23,7 @@
 
 切换到syscall分支
 
-![](image/2-1.png)
+<img src="image/2-1.png" alt="image" height="300">
 
 
 ## Using gdb (easy)
@@ -34,7 +34,7 @@
 ### 2.实验内容
 1. 输入`make qemu-gdb`。
 
-![](image/2-2.png)
+    <img src="image/2-2.png" alt="image" height="300">
 
 2. 打开另一个终端，先安装多架构GDB：
     ```bash
@@ -47,47 +47,47 @@
     ```
     然后在GDB中连接QEMU。
 
-    ![](image/2-3.png)
+    <img src="image/2-3.png" alt="image" height="300">
 
 3. 设置断点并继续执行直到触发断点。
 
-![](image/2-4.png)
+    <img src="image/2-4.png" alt="image" height="300">
 
 4. 输入`layout src`将窗口一分为二，可查看源码布局。
 
-![](image/2-5.png)
+    <img src="image/2-5.png" alt="image" height="300">
 
 5. 输入`n`直到跳过`struct proc *p = myproc();`，打印当前进程的结构体。
 
-![](image/2-6.png)
+    <img src="image/2-6.png" alt="image" height="300">
 
 6. 查看`p->trapframe->a7`的值，查看`sstatus`寄存器，查看调用栈：
     - `p->trapframe->a7`的值为`0x7`，表示系统调用号，用于告诉内核用户程序请求执行哪个系统调用。
     - 要看CPU之前处于什么模式，可以查看`sstatus`寄存器中SPP位（第8位），SPP位为0表示CPU之前处于用户模式。
 
-    ![](image/2-7.png)
+      <img src="image/2-7.png" alt="image" height="300">
 
     - 用`backtrace`可以看到`usertrap()`就是直接调用`syscall`的函数。
 
-    ![](image/2-8.png)
+      <img src="image/2-8.png" alt="image" height="300">
 
 7. 将`syscall.c`中`num = p->trapframe->a7;`替换为`num = *(int *)0;`会导致内核panic，要追踪内核page-fault panic的来源，需要搜索刚刚看到的panic打印的`sepc`值在文件`kernel/kernel.asm`，其中包含编译的内核。
 
-![](image/2-9.png)
+    <img src="image/2-9.png" alt="image" height="300">
 
 8. 崩溃时执行的汇编指令：`lw a3,0(zero)`，对应`num`变量的寄存器：`a3`。
 
-![](image/2-10.png)
+    <img src="image/2-10.png" alt="image" height="300">
 
-![](image/2-11.png)
+    <img src="image/2-11.png" alt="image" height="300">
 
 9. 输入`layout asm`，再输入`c`，程序会停在`lw a3,0(zero)`指令处，这是崩溃前的最后一条指令。
 
-![](image/2-12.png)
+    <img src="image/2-12.png" alt="image" height="300">
 
 10. 确认内核panic时正在运行的进程的名称及进程ID。
 
-![](image/2-13.png)
+    <img src="image/2-13.png" alt="image" height="300">
 
 ### 3.问题解决
 1. 最开始想尝试`gdb kernel/kernel`（启动GDB并加载内核符号）发现单步执行时出现`(gdb) c The program is not being run.`的问题，安装多架构GDB解决问题。
@@ -184,7 +184,9 @@ fork(void)
   [SYS_trace]  "trace"
   };
 ```
+
     - 再修改`syscall`函数。
+
 ```c  
   void syscall(void) {
   int num;
@@ -207,7 +209,9 @@ fork(void)
   }
 }
 ```
+
     - 然后在`syscalls`数组中添加`sys_trace`条目。
+
 ```c  
 [SYS_close]    sys_close,
 [SYS_trace]    sys_trace    // add
@@ -215,11 +219,11 @@ fork(void)
 6. 在`Makefile`的`UPROGS`部分添加`$U/_trace \`。
 7. 进行验证。
 
-![](image/2-14.png)
+    <img src="image/2-14.png" alt="image" height="300">
 
-![](image/2-15.png)
+    <img src="image/2-15.png" alt="image" height="300">
 
-![](image/2-16.png)
+    <img src="image/2-16.png" alt="image" height="300">
 
 ### 3.问题解决
 1. 在`kernel/syscall.c`顶部位添加添加函数声明，导致未定义的错误。
@@ -237,7 +241,7 @@ fork(void)
 1. 漏洞环境已经预先搭建完成，`#ifndef LAB_SYSCALL`使清零代码被自动排除，从而实现“内存分配后保留之前的内容”的漏洞效果。
 2. 先使用`sbrk(PGSIZE*17)`分配了17页内存（实际使用的内存应该是与第一段代码中分配的内存区域重叠）；然后通过`end + 32`来定位到第一段代码写入`argv[1]`（即传入的秘密密码）的内存地址；最后将8字节秘密写入文件描述符2（stderr）。
 
-![](image/2-17.png)
+    <img src="image/2-17.png" alt="image" height="300">
 
 3. 要使攻击有效，必须确保密码数据在`end + 32`这个位置，因此不能将32改为0。如果修改为0，攻击就会失效，因为代码的内存布局和攻击的预期位置都发生了变化。
 
@@ -250,4 +254,4 @@ fork(void)
 
 ## 实验得分
 
-![](image/2-18.png)
+    <img src="image/2-18.png" alt="image" height="300">
