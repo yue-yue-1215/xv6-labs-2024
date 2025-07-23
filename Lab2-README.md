@@ -55,7 +55,7 @@
 
 4. 输入`layout src`将窗口一分为二，可查看源码布局。
 
-    <img src="image/2-5.png" alt="image" height="150">
+    <img src="image/2-5.png" alt="image" height="300">
 
 5. 输入`n`直到跳过`struct proc *p = myproc();`，打印当前进程的结构体。
 
@@ -151,9 +151,6 @@ fork(void)
   }
   np->trace_mask = p->trace_mask;  // add
 ```
-以下是格式调整后的完整内容，可直接复制使用：
-
-```markdown
 5. 修改系统调用处理函数以打印跟踪信息，修改`kernel/syscall.c`：
     - 首先添加系统调用名称数组并声明函数。
 ```c
@@ -213,7 +210,6 @@ void syscall(void) {
 ```c
 [SYS_close]    sys_close,
 [SYS_trace]    sys_trace    // add
-```
 ```
 6. 在`Makefile`的`UPROGS`部分添加`$U/_trace \`。
 7. 进行验证。
