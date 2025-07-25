@@ -1,3 +1,4 @@
+
 // Physical memory allocator, for user processes,
 // kernel stacks, page-table pages,
 // and pipe buffers. Allocates whole 4096-byte pages.
@@ -23,10 +24,16 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct {
+  struct spinlock lock;
+  struct run *freelist;
+} kmem_super;
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  initlock(&kmem_super.lock, "kmem_super");
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -35,8 +42,12 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)(pa_end - SUPERPAGE_MEM); p += PGSIZE)
     kfree(p);
+
+  p = (char *)SUPERPGROUNDUP((uint64)p);
+  for (; p + SUPERPGSIZE <= (char *)pa_end; p += SUPERPGSIZE)
+    superkfree(p);
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -79,4 +90,40 @@ kalloc(void)
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+// Free a super page
+void
+superkfree(void *pa)
+{
+  struct run *r;
+
+  if (((uint64)pa % SUPERPGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
+    panic("superkfree");
+
+  // Fill with junk to catch dangling refs.
+  memset(pa, 1, PGSIZE);
+
+  r = (struct run *)pa;
+
+  acquire(&kmem_super.lock);
+  r->next = kmem_super.freelist;
+  kmem_super.freelist = r;
+  release(&kmem_super.lock);
+}
+
+// Allocate a super page
+void *
+superkalloc(void)
+{
+  struct run *r;
+  acquire(&kmem_super.lock);
+  r = kmem_super.freelist;
+  if (r)
+    kmem_super.freelist = r->next;
+  release(&kmem_super.lock);
+
+  if (r)
+    memset((char *)r, 5, SUPERPGSIZE); // fill with junk
+  return (void *)r;
 }

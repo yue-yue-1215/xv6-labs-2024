@@ -1,3 +1,4 @@
+
 #ifdef LAB_MMAP
 typedef unsigned long size_t;
 typedef long int off_t;
@@ -67,6 +68,8 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+void*           superkalloc(void);
+void            superkfree(void*);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -186,6 +189,9 @@ void            vmprint(pagetable_t);
 #endif
 #ifdef LAB_PGTBL
 pte_t*          pgpte(pagetable_t, uint64);
+pte_t*          walk_super(pagetable_t, uint64, int);
+uint64          uvmalloc_super(pagetable_t, uint64, uint64, int);
+int             mappages_super(pagetable_t, uint64, uint64, uint64, int);
 #endif
 
 // plic.c
