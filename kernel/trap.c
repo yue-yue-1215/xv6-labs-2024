@@ -46,10 +46,10 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -77,8 +77,24 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    // Handle alarm ticks if an alarm is set.
+    if(p->alarm_interval > 0) {
+      p->ticks_elapsed++;
+      if(p->ticks_elapsed >= p->alarm_interval) {
+        // Fire the alarm only if the handler is not already running.
+        if(p->in_alarm == 0) {
+          p->trapframe_backup = *(p->trapframe);
+          p->in_alarm = 1;
+          // We redirect the user program counter to the handler's address.
+          p->trapframe->epc = p->alarm_handler;
+          // Reset the counter for the next alarm cycle.
+          p->ticks_elapsed = 0;
+        }
+      }
+    }
     yield();
+  }
 
   usertrapret();
 }
@@ -215,4 +231,3 @@ devintr()
     return 0;
   }
 }
-

@@ -1,0 +1,12 @@
+test0 start
+.alarm!
+test0 passed
+test1 start
+.alarm!
+.alarm!
+test1 passed
+test2 start
+......alarm!
+test2 passed
+test3 start
+test3 passed

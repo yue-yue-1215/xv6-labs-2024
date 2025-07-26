@@ -176,3 +176,22 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void)
+{
+  uint64 fp = r_fp(); // get the current frame pointer
+  uint64 stack_bottom = PGROUNDDOWN(fp);
+  uint64 stack_top = stack_bottom + PGSIZE;
+
+  printf("backtrace:\n");
+
+  while (fp >= stack_bottom && fp < stack_top) {
+    // return address is in fp-8
+    uint64 return_addr = *(uint64*)(fp - 8);
+    printf("%p\n", (void*)return_addr);
+
+    // last frame pointer is in fp-16
+    fp = *(uint64*)(fp - 16);
+  }
+}

@@ -1,3 +1,4 @@
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -103,5 +104,10 @@ struct proc {
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
+  int alarm_interval;	       // Alarm interval in ticks
+  uint64 alarm_handler;        // Address of the alarm handler
+  int ticks_elapsed;           // Ticks elapsed since last alarm
+  struct trapframe trapframe_backup;  // Backup of trapframe
+  int in_alarm;                // 1 if alarm handler is runing, 0 otherwis
   char name[16];               // Process name (debugging)
 };

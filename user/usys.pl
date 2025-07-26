@@ -1,3 +1,4 @@
+
 #!/usr/bin/perl -w
 
 # Generate usys.S, the stubs for syscalls.
@@ -36,3 +37,5 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("sigalarm");
+entry("sigreturn");

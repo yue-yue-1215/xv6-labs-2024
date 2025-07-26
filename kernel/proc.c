@@ -125,6 +125,12 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // Initialize alarm fields.
+  p->alarm_interval = 0;
+  p->alarm_handler = 0;
+  p->ticks_elapsed = 0;
+  p->in_alarm = 0;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
