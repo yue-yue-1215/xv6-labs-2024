@@ -46,29 +46,45 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
-  if(r_scause() == 8){
-    // system call
 
+  uint64 scause = r_scause();
+  if(scause == 8){
     if(killed(p))
       exit(-1);
-
-    // sepc points to the ecall instruction,
-    // but we want to return to the next instruction.
     p->trapframe->epc += 4;
-
-    // an interrupt will change sepc, scause, and sstatus,
-    // so enable only now that we're done with those registers.
     intr_on();
-
     syscall();
+  } else if (scause == 15) {
+    uint64 fault_va = r_stval(); 
+    pte_t *pte;
+    char *mem;
+
+    if(fault_va >= p->sz || (pte = walk(p->pagetable, fault_va, 0)) == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0) {
+      setkilled(p);
+    } else if ((*pte & PTE_COW) == 0) {
+      setkilled(p);
+    } else {
+      fault_va = PGROUNDDOWN(fault_va);
+      if((mem = kalloc()) == 0){
+        setkilled(p);
+      } else {
+        uint64 pa = PTE2PA(*pte);
+        uint flags = PTE_FLAGS(*pte);
+
+        memmove(mem, (char*)pa, PGSIZE);
+
+        kfree((void*)pa);
+
+        *pte = PA2PTE((uint64)mem) | (flags & ~PTE_COW) | PTE_W;
+      }
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
+    printf("usertrap(): unexpected scause 0x%lx pid=%d\n", scause, p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
     setkilled(p);
   }
@@ -215,4 +231,3 @@ devintr()
     return 0;
   }
 }
-

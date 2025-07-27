@@ -23,10 +23,16 @@ struct {
   struct run *freelist;
 } kmem;
 
+struct {
+  struct spinlock lock;
+  int counts[PHYSTOP / PGSIZE];
+} ref;
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  initlock(&ref.lock, "refcount");
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -35,8 +41,13 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE){
+    // This is necessary because kfree() now expects to decrement a count.
+    // During initialization, this primes the pages for the first free.
+    // No lock is needed here as this runs single-threaded at boot.
+    ref.counts[(uint64)p / PGSIZE] = 1;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -51,15 +62,37 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
-  memset(pa, 1, PGSIZE);
+  acquire(&ref.lock);
+  if(ref.counts[(uint64)pa / PGSIZE] < 1)
+    panic("kfree: ref count is already 0");
+  ref.counts[(uint64)pa / PGSIZE]--;
+  int count = ref.counts[(uint64)pa / PGSIZE];
+  release(&ref.lock);
 
-  r = (struct run*)pa;
+  if (count == 0) {
+    // Fill with junk to catch dangling refs.
+    memset(pa, 1, PGSIZE);
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+    r = (struct run*)pa;
+
+    acquire(&kmem.lock);
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    release(&kmem.lock);
+  }
+}
+
+void
+add_ref(void *pa)
+{
+  acquire(&ref.lock);
+  if((uint64)pa >= PHYSTOP || (uint64)pa < (uint64)end)
+    panic("add_ref: pa out of range");
+  if(ref.counts[(uint64)pa / PGSIZE] < 1)
+    panic("add_ref: ref count less than 1");
+
+  ref.counts[(uint64)pa / PGSIZE]++;
+  release(&ref.lock);
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -76,7 +109,11 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
+    acquire(&ref.lock);
+    ref.counts[(uint64)r / PGSIZE] = 1;
+    release(&ref.lock);
+  }
   return (void*)r;
 }
