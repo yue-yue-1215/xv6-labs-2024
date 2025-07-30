@@ -384,7 +384,8 @@ bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
   struct buf *bp;
-  //判断逻辑块号bn是否属于直接块范围
+
+  // 直接块 (0-10)
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0){
       addr = balloc(ip->dev);
@@ -396,6 +397,7 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NDIRECT;
 
+  // 单重间接块 (11-266)
   if(bn < NINDIRECT){
     if((addr = ip->addrs[NDIRECT]) == 0){
       addr = balloc(ip->dev);
@@ -417,55 +419,53 @@ bmap(struct inode *ip, uint bn)
   }
   bn -= NINDIRECT;
 
-  if(bn < NDOUBLY_INDIRECT){
-    uint l1_addr; 
-    if((l1_addr = ip->addrs[NDIRECT + 1]) == 0){
-      l1_addr = balloc(ip->dev);
-      if(l1_addr == 0)
-        return 0;
-      ip->addrs[NDIRECT + 1] = l1_addr;
-    }
+  // 双重间接块 (267-65802)
+  if(bn < NNINDIRECT){  // 修复：使用 NINDIRECT * NINDIRECT
+    int block_index = bn / NINDIRECT;  // 在双重间接块中的索引
+    int data_index = bn % NINDIRECT;   // 在单重间接块中的索引
+    
+    // 分配双重间接块
+    if((addr = ip->addrs[NDIRECT + 1]) == 0)
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
 
-    bp = bread(ip->dev, l1_addr);
+    // 读取双重间接块
+    bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
-
-    uint l2_addr; 
-    if((l2_addr = a[bn / NINDIRECT]) == 0){
-      l2_addr = balloc(ip->dev);
-      if(l2_addr == 0){
-        brelse(bp);
-        return 0;
-      }
-
-      a[bn / NINDIRECT] = l2_addr;
+    
+    // 分配单重间接块
+    if((addr = a[block_index]) == 0){
+      a[block_index] = addr = balloc(ip->dev);
       log_write(bp);
     }
-    brelse(bp); 
-    bp = bread(ip->dev, l2_addr);
-    a = (uint*)bp->data;
+    brelse(bp);
 
-    if((addr = a[bn % NINDIRECT]) == 0) {
-      addr = balloc(ip->dev);
-      if(addr != 0) {
-        a[bn % NINDIRECT] = addr;
-        log_write(bp);
-      }
+    // 读取单重间接块
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    
+    // 分配数据块
+    if((addr = a[data_index]) == 0){  // 修复：使用 data_index 而不是 block_index
+      a[data_index] = addr = balloc(ip->dev);  // 修复：使用 data_index
+      log_write(bp);
     }
     brelse(bp);
+
     return addr;
   }
 
   panic("bmap: out of range");
 }
+
 // Truncate inode (discard contents).
 // Caller must hold ip->lock.
 void
 itrunc(struct inode *ip)
 {
   int i, j;
-  struct buf *bp, *bp2;
-  uint *a, *a2;
+  struct buf *bp, *temp;  // 添加 temp 声明
+  uint *a, *b;            // 添加 b 声明
 
+  // 释放直接块
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
       bfree(ip->dev, ip->addrs[i]);
@@ -473,6 +473,7 @@ itrunc(struct inode *ip)
     }
   }
 
+  // 释放单重间接块 (添加这部分)
   if(ip->addrs[NDIRECT]){
     bp = bread(ip->dev, ip->addrs[NDIRECT]);
     a = (uint*)bp->data;
@@ -485,26 +486,26 @@ itrunc(struct inode *ip)
     ip->addrs[NDIRECT] = 0;
   }
 
+  // 释放双重间接块
   if(ip->addrs[NDIRECT + 1]){
-    uint addrs_copy[NINDIRECT];
     bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
-    memmove(addrs_copy, bp->data, sizeof(addrs_copy));
-    brelse(bp);
-
-    for(i = 0; i < NINDIRECT; i++){
-      if(addrs_copy[i]){
-        bp2 = bread(ip->dev, addrs_copy[i]);
-        a2 = (uint*)bp2->data;
-        for(j = 0; j < NINDIRECT; j++){
-          if(a2[j])
-            bfree(ip->dev, a2[j]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECT; j++){
+      if(a[j]) {
+        temp = bread(ip->dev, a[j]);
+        b = (uint*)temp->data;
+        for(int k = 0; k < NINDIRECT; k++) {
+          if(b[k]) {
+            bfree(ip->dev, b[k]);
+          }
         }
-        brelse(bp2);
-        bfree(ip->dev, addrs_copy[i]);
+        brelse(temp);
+        bfree(ip->dev, a[j]);
       }
     }
-    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
-    ip->addrs[NDIRECT + 1] = 0;
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);  // 修复：应该是 NDIRECT + 1
+    ip->addrs[NDIRECT + 1] = 0;              // 修复：应该是 NDIRECT + 1
   }
 
   ip->size = 0;
@@ -753,4 +754,47 @@ struct inode*
 nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
+}
+
+#define MAX_SYMLINK_DEPTH 10
+
+// 跟随符号链接，返回最终的 inode
+// 调用者必须已经锁定 ip，返回时 ip 被解锁
+// 成功时返回锁定的目标 inode，失败返回 0
+struct inode*
+follow_symlink(struct inode *ip)
+{
+  char target[MAXPATH];
+  struct inode *next;
+  int depth = 0;
+
+  while(ip->type == T_SYMLINK && depth < MAX_SYMLINK_DEPTH) {
+    // 读取符号链接的目标路径
+    if(readi(ip, 0, (uint64)target, 0, MAXPATH) <= 0) {
+      iunlockput(ip);
+      return 0;
+    }
+    
+    // 确保字符串以 null 结尾
+    target[MAXPATH-1] = '\0';
+    
+    iunlockput(ip);
+    
+    // 查找目标 inode
+    if((next = namei(target)) == 0) {
+      return 0;
+    }
+    
+    ilock(next);
+    ip = next;
+    depth++;
+  }
+
+  if(depth >= MAX_SYMLINK_DEPTH) {
+    // 符号链接循环或深度过深
+    iunlockput(ip);
+    return 0;
+  }
+
+  return ip;
 }

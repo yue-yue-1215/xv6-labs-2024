@@ -16,8 +16,6 @@
 #include "file.h"
 #include "fcntl.h"
 
-#define MAX_SYMLINK_DEPTH 10
-
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -294,7 +292,7 @@ create(char *path, short type, short major, short minor)
 
   return ip;
 
- fail:
+fail:
   // something went wrong. de-allocate ip.
   ip->nlink = 0;
   iupdate(ip);
@@ -312,9 +310,11 @@ sys_open(void)
   struct inode *ip;
   int n;
 
-  argint(1, &omode);
+  // 修复：分开处理参数获取
   if((n = argstr(0, path, MAXPATH)) < 0)
     return -1;
+  
+  argint(1, &omode);  // argint 不返回错误码
 
   begin_op();
 
@@ -330,40 +330,17 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
-
-    // -- symlinks --
-    int depth = 0;
-    // Follow symbolic links, unless O_NOFOLLOW is specified.
-    while(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
-      // Check for symbolic link cycle.
-      if(depth++ >= MAX_SYMLINK_DEPTH) {
-        iunlockput(ip);
+    
+    // 处理符号链接
+    if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+      // 跟随符号链接
+      if((ip = follow_symlink(ip)) == 0) {
         end_op();
         return -1;
       }
-
-      // Read the target path from the link's content.
-      char target_path[MAXPATH];
-      if(readi(ip, 0, (uint64)target_path, 0, ip->size) != ip->size) {
-        iunlockput(ip);
-        end_op();
-        return -1;
-      }
-      // Null-terminate the path.
-      target_path[ip->size] = '\0';
-
-      // Release the current symlink inode.
-      iunlockput(ip);
-
-      // Resolve the new path.
-      if((ip = namei(target_path)) == 0) {
-        end_op();
-        return -1;
-      }
-      // Lock the new inode to check its type in the next loop iteration.
-      ilock(ip);
+      // follow_symlink 返回已锁定的 inode
     }
-
+    
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
@@ -543,24 +520,23 @@ sys_pipe(void)
 uint64
 sys_symlink(void)
 {
-  char path[MAXPATH], target[MAXPATH];
+  char target[MAXPATH], path[MAXPATH];
   struct inode *ip;
-
-  argstr(0, target, MAXPATH);
-  argstr(1, path, MAXPATH);
+  
+  // 获取参数
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
 
   begin_op();
-
-  ip = create(path, T_SYMLINK, 0, 0);
-  if(ip == 0){
+  
+  // 创建新的 inode
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
     end_op();
     return -1;
   }
 
-  int target_len = strlen(target);
-  if(writei(ip, 0, (uint64)target, 0, target_len) != target_len) {
-    ip->nlink = 0;
-    iupdate(ip);
+  // 将目标路径写入 inode 的数据块
+  if(writei(ip, 0, (uint64)target, 0, strlen(target)) != strlen(target)){
     iunlockput(ip);
     end_op();
     return -1;
