@@ -503,3 +503,132 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+getfreemmapvm(unsigned long len)
+{
+  struct proc *p = myproc();
+  for(int i = 1; i < NVMA; i++){
+    if(p->vma[i].inuse == 1){
+      if(p->vma[i-1].addr - PGROUNDUP(p->vma[i].addr + p->vma[i].len) >= len)
+        return PGROUNDUP(p->vma[i].addr + p->vma[i].len);
+    } else
+      break;
+  }
+  return PGROUNDDOWN(p->mmap_top - len);
+}
+
+void
+updatemmaptop(void)
+{
+  struct proc *p = myproc();
+  for(int i = 0; i < NVMA; i++){
+    if(p->vma[i].inuse == 1)
+      p->mmap_top = p->vma[i].addr;
+  }
+}
+
+uint64
+sys_mmap(void)
+{
+  uint64 addr;
+  unsigned long len;
+  int prot, flags, fd;
+  uint64 offset;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+  argaddr(1, &len);
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+  argaddr(5, &offset);
+
+  if(addr % PGSIZE != 0 || len % PGSIZE != 0)
+    panic("mmap: unaligned addr or len not supported");
+
+  struct file *f = p->ofile[fd];
+  if(f == 0)
+    return -1;
+  if(((prot & PROT_READ) && !f->readable) || ((prot & PROT_WRITE) && (flags & MAP_SHARED) && !f->writable))
+    return -1;
+
+  if(addr == 0)
+    addr = getfreemmapvm(len);
+
+  for(int i = 0; i < NVMA; i++){
+    if(p->vma[i].inuse == 1 && p->vma[i].addr > addr)
+      continue;
+    for(int j = NVMA-1; j > i; j--)
+      p->vma[j] = p->vma[j-1];
+    p->vma[i].addr = addr;
+    p->vma[i].len = len;
+    p->vma[i].prot = prot;
+    p->vma[i].flags = flags;
+    p->vma[i].file = filedup(p->ofile[fd]);
+    p->vma[i].offset = offset;
+    p->vma[i].inuse = 1;
+    break;
+  }
+
+  updatemmaptop();
+
+  return addr;
+}
+
+uint64
+sys_munmap(void)
+{
+  uint64 addr;
+  unsigned long len;
+  struct proc *p = myproc();
+
+  argaddr(0, &addr);
+  argaddr(1, &len);
+
+  if(addr % PGSIZE != 0 || len % PGSIZE != 0)
+    panic("munmap: unaligned addr or len not supported");
+  for(int i = 0; i < NVMA; i++){
+    if(p->vma[i].inuse == 1 && p->vma[i].addr <= addr
+      && addr + len <= p->vma[i].addr + p->vma[i].len){
+      for(uint64 j = addr; j < addr + len; j += PGSIZE){
+        uint64 pa = walkaddr(p->pagetable, j);
+        if(pa != 0){
+          if(p->vma[i].flags & MAP_SHARED && p->vma[i].prot & PROT_WRITE){
+            struct inode *ip = p->vma[i].file->ip;
+            begin_op();
+            ilock(ip);
+            int n = PGSIZE;
+            if(p->vma[i].offset + j - p->vma[i].addr + n > p->vma[i].file->ip->size)
+              n = p->vma[i].file->ip->size - (p->vma[i].offset + j - p->vma[i].addr);
+            if(writei(ip, 0, pa, p->vma[i].offset + j - p->vma[i].addr, n) == -1){
+              iunlock(ip);
+              end_op();
+              panic("munmap: writei failed");
+            }
+            iunlock(ip);
+            end_op();
+          }
+          uvmunmap(p->pagetable, j, 1, 1);
+        }
+      }
+      if(p->vma[i].addr == addr && p->vma[i].len == len){
+        fileclose(p->vma[i].file);
+        p->vma[i].inuse = 0;
+        for(int j = i; j < NVMA-1; j++)
+          p->vma[j] = p->vma[j+1];
+      } else if(p->vma[i].addr == addr){
+        p->vma[i].addr += len;
+        p->vma[i].len -= len;
+        p->vma[i].offset += len;
+      } else if(p->vma[i].addr + p->vma[i].len == addr + len){
+        p->vma[i].len -= len;
+      } else {
+        panic("munmap: hole in vma not supported");
+      }
+      break;
+    }
+  }
+  updatemmaptop();
+  return 0;
+}

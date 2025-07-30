@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -67,11 +71,52 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }else {
+    if(r_scause() == 13 || r_scause() == 15){
+      for(int i = 0; i < NVMA; i++){
+        if(p->vma[i].inuse && p->vma[i].addr <= r_stval() && r_stval() < p->vma[i].addr + p->vma[i].len){
+          void *pa = kalloc();
+          memset(pa, 0, PGSIZE);
+          if(pa == 0){
+            printf("usertrap(): out of memory\n");
+            goto bad;
+          }
+          struct inode *ip = p->vma[i].file->ip;
+          ilock(ip);
+          if(readi(ip, 0, (uint64)pa, p->vma[i].offset + PGROUNDDOWN(r_stval() - p->vma[i].addr), PGSIZE) == -1){
+            iunlock(ip);
+            kfree(pa);
+            printf("usertrap(): readi failed\n");
+            goto bad;
+          }
+          iunlock(ip);
+          int perm = PTE_U;
+          if(p->vma[i].prot & PROT_READ)
+            perm |= PTE_R;
+          if(p->vma[i].prot & PROT_WRITE)
+            perm |= PTE_W;
+          if(p->vma[i].prot & PROT_EXEC)
+            perm |= PTE_X;
+          if((r_scause() == 13 && !(perm & PTE_R)) || (r_scause() == 15 && !(perm & PTE_W))){
+            kfree(pa);
+            goto bad;
+          }
+          if(mappages(p->pagetable, PGROUNDDOWN(r_stval()), PGSIZE, (uint64)pa, perm) != 0){
+            kfree(pa);
+            printf("usertrap(): mappages failed\n");
+            goto bad;
+          }
+          goto good;
+        }
+      }
+    }
+  bad:
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
     setkilled(p);
   }
+
+good: 
 
   if(killed(p))
     exit(-1);
